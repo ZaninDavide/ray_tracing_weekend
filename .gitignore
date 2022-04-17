@@ -1,0 +1,5 @@
+/.DS_Store
+/.vscode
+/build_run.sh
+/image.ppm
+/ray_tracing
