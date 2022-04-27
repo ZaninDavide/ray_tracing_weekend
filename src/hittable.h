@@ -1,12 +1,16 @@
 #pragma once
 
 #include "ray.h"
+#include "utils.h"
+
+class material;
 
 struct hit_res {
     vec3 point;
     vec3 normal;
     double t;
     bool front;
+    std::shared_ptr<material> mat;
     
     inline void set_face_normal(const ray& r, const vec3& outward_normal) {
         front = dot(r.dir, outward_normal) < 0;
@@ -24,9 +28,10 @@ class sphere : public hittable {
 public:
     vec3 center;
     double radius;
+    std::shared_ptr<material> mat;
 public:
     sphere() {}
-    sphere(vec3 center, double radius) : center(center), radius(radius) {}  
+    sphere(vec3 center, double radius, std::shared_ptr<material> mat) : center(center), radius(radius), mat(mat) {}  
     ~sphere() = default;
     
     bool hit(const ray& r, double t_min, double t_max, hit_res& res) const override {
@@ -50,6 +55,7 @@ public:
 
         res.t = root;
         res.point = r.at(res.t);
+        res.mat = mat;
         vec3 out_normal = (res.point - center) / radius;
         res.set_face_normal(r, out_normal);
         

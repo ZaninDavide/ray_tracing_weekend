@@ -6,15 +6,35 @@
 #include "hittable.h"
 #include "hittable_list.h"
 #include "utils.h"
+#include "camera.h"
+#include "material.h"
 
-#define WIDTH 1024
-#define HEIGHT 1024
+#define SAMPLES 10
+#define DIFFUSE_BOUNCES 25
 
-vec3 ray_color(const ray& r, const hittable& world) {
+vec3 ray_color(const ray& r, const hittable& world, uint depth = 0) {
+    // stop recursion
+    if(depth >= DIFFUSE_BOUNCES) return vec3(0);
+
     // check if we hit the sphere
     hit_res hit;
-    if (world.hit(r, 0.01, 100, hit)){
-        return hit.normal/2 + 0.5;
+    if (world.hit(r, 0.001, infinity, hit)){
+        // if we hit something keep bouncing the light
+        // to bounce the light we have to choose a rondom direction
+        // we use the tangent unit sphere technique to make more probable
+        // to bounce the light perpendicular to the surface
+        // rather than at a shallow angle
+        // vec3 target = hit.point + hit.normal + random_in_unit_sphere();
+        // ray new_ray = ray(hit.point, target - hit.point);
+        // Different diffuse distributions: random_in_unit_sphere, random_on_unit_sphere, random_in_hemisphere
+        ray new_ray;
+        vec3 attenuation;
+        // use the material of the hit object to scatter the light rays
+        if(hit.mat->scatter(r, hit, attenuation, new_ray)) {
+            // light was scatterd
+            return attenuation * ray_color(new_ray, world, depth + 1);
+        }
+        return vec3(0); // the light was absorbed
     }
 
     // we use the y component (up and down) to interpolate between two shades of blue
@@ -25,23 +45,13 @@ vec3 ray_color(const ray& r, const hittable& world) {
 // https://raytracing.github.io/books/RayTracingInOneWeekend.html
 int main() {
 
-    // CAMERA
-    double view_height = 2.0;
-    double view_width = (double)(HEIGHT)/(double)(WIDTH) * view_height;
-    double focal_length = 1.0;
-
-    // https://raytracing.github.io/images/fig-1.03-cam-geom.jpg  
-    // position in 3D space of the bottom left corner of the view frame
-    // the focal length has to be subtracted because the z axes goes towards the camera
-    vec3 origin(0);
-    vec3 bottom_left = vec3(-view_width/2, -view_height/2, -focal_length);
-    vec3 left_to_right = vec3(view_width, 0, 0);
-    vec3 bottom_to_top = vec3(0, view_height, 0);
-
     // WORLD
     hittable_list world;
-    world.add(make_shared<sphere>(vec3(0, 0, -1), 0.5));
-    world.add(make_shared<sphere>(vec3(0, 0.5, -1), 0.25));
+    world.add(make_shared<sphere>(vec3(0, 0, -1), 0.5, make_shared<metal>(vec3(0,1,0))));
+    world.add(make_shared<sphere>(vec3(0, -1000.5, -1), 1000, make_shared<lambertian>(vec3(1,1,1))));
+    world.add(make_shared<sphere>(vec3(0.9, 0, -1), 0.2, make_shared<lambertian>(vec3(0.4,0.2,0.8))));
+
+    camera cam;
 
     // RENDER
     std::cout << "P3\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
@@ -50,15 +60,19 @@ int main() {
         // this will be printed in console but won't end up inside the image file
         std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
         for (int i = 0; i < WIDTH; ++i) {
-            // uv coordinates
-            double u = (double)(i) / (double)(WIDTH - 1); // from 0 to 1, from left to right
-            double v = (double)(j) / (double)(HEIGHT - 1); // from 0 to 1, from bottom to top
-
-            // ray from the origin toward the pixel (i, j)
-            ray r(origin, bottom_left + u*left_to_right + v*bottom_to_top);
-
+            vec3 pixel = vec3(0);
+            // MULTI-SAMPLING
+            for(int s = 0; s < SAMPLES; s++) {
+                // uv coordinates
+                double u = ((double)(i) + random_double()) / (double)(WIDTH - 1); // from 0 to 1, from left to right
+                double v = ((double)(j) + random_double()) / (double)(HEIGHT - 1); // from 0 to 1, from bottom to top
+                pixel += ray_color(cam.get_ray(u, v), world);
+            }
+            pixel /= (double)SAMPLES;
+            // gamma correction
+            pixel = vec3(sqrt(pixel.x), sqrt(pixel.y), sqrt(pixel.z));
             // output color
-            write_color(std::cout, ray_color(r, world));
+            write_color(std::cout, pixel);
         }
     }
 

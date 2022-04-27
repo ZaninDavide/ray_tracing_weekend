@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include "utils.h"
 
 class vec3 {
 public:
@@ -42,6 +43,19 @@ public:
     }
     double len2() const {
         return x*x + y*y + z*z;
+    }
+
+    bool is_small() const {
+        return (x < 1e-8) && (y < 1e-8) && (z < 1e-8);
+    }
+
+    // static functions for this class
+    inline static vec3 random() {
+        return vec3(random_double(), random_double(), random_double());
+    }
+
+    inline static vec3 random(double min, double max) {
+        return vec3(random_double(min,max), random_double(min,max), random_double(min,max));
     }
 };
 
@@ -89,4 +103,29 @@ inline vec3 unit(const vec3 &v) {
 }
 inline vec3 abs(const vec3 &v) {
     return vec3(abs(v.x), abs(v.y), abs(v.z));
+}
+vec3 reflect(const vec3& v, const vec3& n) {
+    return v - 2*dot(v,n)*n;
+}
+
+vec3 random_in_unit_sphere() {
+    // we take a random point inside the cube 
+    // and go on until the random point is inside the sphere
+    while (true) {
+        vec3 p = vec3::random(-1,1);
+        if (p.len2() >= 1) continue;
+        return p;
+    }
+}
+
+vec3 random_on_unit_sphere() {
+    return unit(random_in_unit_sphere());
+}
+
+vec3 random_in_hemisphere(const vec3& normal) {
+    vec3 in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0) // In the same hemisphere as the normal
+        return in_unit_sphere;
+    else
+        return -in_unit_sphere;
 }
